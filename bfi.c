@@ -7,13 +7,21 @@ int interp(char *code) {
   char *tape = (char *)calloc(TAP_SIZE, 1);
   char *ptr = tape;
 
-  while(code) {
+  while(*code) {
     switch(*code) {
       case '>':
+        if ((ptr + 1) > (tape + TAP_SIZE)) {
+            fprintf(stderr, "error: tap overflow\n");
+            return -1;
+        }
         ptr++;
         break;
       
       case '<':
+        if ((ptr - 1) < tape) {
+            fprintf(stderr, "error: tap underflow\n");
+            return -1;
+        }
         ptr--;
         break;
       
@@ -82,7 +90,9 @@ int main(int argc, char *argv[]) {
   fseek(file, 0, SEEK_SET);
 
   char *code = (char *)malloc(length + 1);
-  fread(code, 1, length, file);
+  int rv = fread(code, 1, length, file);
+  if (rv != length)
+    return 1;
   code[length] = '\0';
   fclose(file);
 
