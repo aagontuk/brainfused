@@ -139,7 +139,6 @@ int interp_cgoto(unsigned char *code_org, int len) {
 
   while(1) {
     right:
-      // printf("RIGHT\n");
       if ((ptr + 1) > (tape + TAP_SIZE)) {
           fprintf(stderr, "error: tap overflow\n");
           return -1;
@@ -149,7 +148,6 @@ int interp_cgoto(unsigned char *code_org, int len) {
       goto *cmds[*code];
 
     left:
-      // printf("LEFT\n");
       if ((ptr - 1) < tape) {
           fprintf(stderr, "error: tap underflow\n");
           return -1;
@@ -159,31 +157,26 @@ int interp_cgoto(unsigned char *code_org, int len) {
       goto *cmds[*code];
 
     inc:
-      // printf("INC\n");
       (*ptr)++;
       code++;
       goto *cmds[*code];
 
     dec:
-      // printf("DEC\n");
       (*ptr)--;
       code++;
       goto *cmds[*code];
 
     out:
-      // printf("OUT\n");
       putchar(*ptr);
       code++;
       goto *cmds[*code];
 
     in:
-      // printf("IN\n");
       *ptr = getchar();
       code++;
       goto *cmds[*code];
 
     open:
-      // printf("OPEN\n");
       if(!*ptr) {
         int loop = 1;
         while(loop) {
@@ -196,7 +189,6 @@ int interp_cgoto(unsigned char *code_org, int len) {
       goto *cmds[*code];
 
     close:
-      // printf("CLOSE\n");
       if(*ptr) {
         int loop = 1;
         while(loop) {
