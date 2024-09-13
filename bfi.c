@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <stdbool.h>
+#include "bf_jit_x86_64.h"
 
 #define TAP_SIZE 1048576
 
@@ -110,7 +111,7 @@ unsigned char char_to_cmd(char c) {
   }
 }
 
-unsigned char *translate(unsigned char *code, int len) {
+unsigned char *transform(unsigned char *code, int len) {
   unsigned char *buf = (unsigned char *)malloc(len);
   int buf_len = 0;
   while(*code) {
@@ -129,7 +130,7 @@ int interp_cgoto(unsigned char *code_org, int len) {
   char *ptr = tape;
   unsigned char *code;
 
-  code = translate(code_org, len);
+  code = transform(code_org, len);
 
   static void *cmds[] = {
     &&halt, &&right, &&left, &&inc, &&dec, &&out, &&in, &&open, &&close
@@ -139,7 +140,6 @@ int interp_cgoto(unsigned char *code_org, int len) {
 
   while(1) {
     right:
-      // printf("RIGHT\n");
       if ((ptr + 1) > (tape + TAP_SIZE)) {
           fprintf(stderr, "error: tap overflow\n");
           return -1;
@@ -149,7 +149,6 @@ int interp_cgoto(unsigned char *code_org, int len) {
       goto *cmds[*code];
 
     left:
-      // printf("LEFT\n");
       if ((ptr - 1) < tape) {
           fprintf(stderr, "error: tap underflow\n");
           return -1;
@@ -159,31 +158,26 @@ int interp_cgoto(unsigned char *code_org, int len) {
       goto *cmds[*code];
 
     inc:
-      // printf("INC\n");
       (*ptr)++;
       code++;
       goto *cmds[*code];
 
     dec:
-      // printf("DEC\n");
       (*ptr)--;
       code++;
       goto *cmds[*code];
 
     out:
-      // printf("OUT\n");
       putchar(*ptr);
       code++;
       goto *cmds[*code];
 
     in:
-      // printf("IN\n");
       *ptr = getchar();
       code++;
       goto *cmds[*code];
 
     open:
-      // printf("OPEN\n");
       if(!*ptr) {
         int loop = 1;
         while(loop) {
@@ -196,7 +190,6 @@ int interp_cgoto(unsigned char *code_org, int len) {
       goto *cmds[*code];
 
     close:
-      // printf("CLOSE\n");
       if(*ptr) {
         int loop = 1;
         while(loop) {
@@ -213,6 +206,10 @@ int interp_cgoto(unsigned char *code_org, int len) {
   }
 
   return 0;
+}
+
+void bf_jit_compile_x86_64(unsigned char *code, int len) {
+  unsigned char *buf = (unsigned char *)malloc(TAP_SIZE);
 }
 
 int main(int argc, char *argv[]) {
