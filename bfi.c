@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <getopt.h>
+#include <stdbool.h>
 
 #define TAP_SIZE 1048576
 
@@ -13,7 +15,7 @@
 #define BF_OPEN 7
 #define BF_CLOSE 8
 
-int interp(unsigned char *code) {
+int bf_interp(unsigned char *code) {
   char *tape = (char *)calloc(TAP_SIZE, 1);
   char *ptr = tape;
 
@@ -83,7 +85,7 @@ int interp(unsigned char *code) {
   return 0;
 }
 
-int char_to_cmd(char c) {
+unsigned char char_to_cmd(char c) {
   switch(c) {
     case '>':
       return BF_RIGHT;
@@ -101,36 +103,43 @@ int char_to_cmd(char c) {
       return BF_OPEN;
     case ']':
       return BF_CLOSE;
-    default:
+    case '\0':
       return '\0';
+    default:
+      return 255;
   }
 }
 
-int translate(unsigned char *code) {
+unsigned char *translate(unsigned char *code, int len) {
+  unsigned char *buf = (unsigned char *)malloc(len);
+  int buf_len = 0;
   while(*code) {
-    *code = char_to_cmd(*code);
+    unsigned char ch = char_to_cmd(*code);
+    if (ch != 255) {
+      buf[buf_len++] = ch;
+    }
     code++;
   }
   
-  return 0;
+  return buf;
 }
 
-int interp_cgoto(unsigned char *code) {
+int interp_cgoto(unsigned char *code_org, int len) {
   char *tape = (char *)calloc(TAP_SIZE, 1);
   char *ptr = tape;
+  unsigned char *code;
 
-  translate(code);
+  code = translate(code_org, len);
 
   static void *cmds[] = {
     &&halt, &&right, &&left, &&inc, &&dec, &&out, &&in, &&open, &&close
   };
+    
+  goto *cmds[*code];
 
   while(1) {
-    if(!*code) break;
-    
-    goto *cmds[*code];
-
     right:
+      // printf("RIGHT\n");
       if ((ptr + 1) > (tape + TAP_SIZE)) {
           fprintf(stderr, "error: tap overflow\n");
           return -1;
@@ -140,6 +149,7 @@ int interp_cgoto(unsigned char *code) {
       goto *cmds[*code];
 
     left:
+      // printf("LEFT\n");
       if ((ptr - 1) < tape) {
           fprintf(stderr, "error: tap underflow\n");
           return -1;
@@ -149,26 +159,31 @@ int interp_cgoto(unsigned char *code) {
       goto *cmds[*code];
 
     inc:
+      // printf("INC\n");
       (*ptr)++;
       code++;
       goto *cmds[*code];
 
     dec:
+      // printf("DEC\n");
       (*ptr)--;
       code++;
       goto *cmds[*code];
 
     out:
+      // printf("OUT\n");
       putchar(*ptr);
       code++;
       goto *cmds[*code];
 
     in:
+      // printf("IN\n");
       *ptr = getchar();
       code++;
       goto *cmds[*code];
 
     open:
+      // printf("OPEN\n");
       if(!*ptr) {
         int loop = 1;
         while(loop) {
@@ -181,12 +196,13 @@ int interp_cgoto(unsigned char *code) {
       goto *cmds[*code];
 
     close:
+      // printf("CLOSE\n");
       if(*ptr) {
         int loop = 1;
         while(loop) {
           code--;
-          if(*code == BF_CLOSE) loop--;
-          if(*code == BF_OPEN) loop++;
+          if(*code == BF_OPEN) loop--;
+          if(*code == BF_CLOSE) loop++;
         }
       }
       code++;
@@ -200,12 +216,30 @@ int interp_cgoto(unsigned char *code) {
 }
 
 int main(int argc, char *argv[]) {
-  if(argc < 2) {
-    printf("Usage: %s <file>\n", argv[0]);
-    return 1;
+  struct option longopts[] = {
+    { .name = "interp", .val = 'i', },
+    { .name = "cgoto", .val = 'g', },
+  };
+
+  bool cgoto = false;
+  bool interp = false;
+
+  int opt;
+  while ((opt = getopt_long(argc, argv, "ig", longopts, NULL)) != -1) {
+    switch(opt) {
+      case 'i':
+        interp = true;
+        break;
+      case 'g':
+        cgoto = true;
+        break;
+      default:
+        printf("Unkown option\n");
+        return 1;
+    }
   }
 
-  FILE *file = fopen(argv[1], "r");
+  FILE *file = fopen(argv[optind], "r");
   if(!file) {
     printf("Error: Could not open file\n");
     return 1;
@@ -222,8 +256,10 @@ int main(int argc, char *argv[]) {
   code[length] = '\0';
   fclose(file);
 
-  // interp(code);
-  interp_cgoto(code);
+  if (interp)
+    bf_interp(code);
+  else if (cgoto)
+    interp_cgoto(code, length);
   
   return 0;
 }
