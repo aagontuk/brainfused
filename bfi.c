@@ -185,8 +185,8 @@ int interp_cgoto(unsigned char *code) {
         int loop = 1;
         while(loop) {
           code--;
-          if(*code == BF_OPEN) loop--;
-          if(*code == BF_CLOSE) loop++;
+          if(*code == BF_CLOSE) loop--;
+          if(*code == BF_OPEN) loop++;
         }
       }
       code++;
