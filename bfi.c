@@ -209,7 +209,84 @@ int interp_cgoto(unsigned char *code_org, int len) {
 }
 
 void bf_jit_compile_x86_64(unsigned char *code, int len) {
-  unsigned char *buf = (unsigned char *)malloc(TAP_SIZE);
+  struct jit_state state;
+  
+  state.buf = (uint8_t *)malloc(MAX_OFFSET);
+  state.offset = 0;
+
+  // push callee saved registers
+  emit_push(&state, RBX);
+  emit_push(&state, RBP);
+  emit_push(&state, R12);
+  emit_push(&state, R13);
+  emit_push(&state, R14);
+  emit_push(&state, R15);
+
+  for (int i = 0; i < len; i++) {
+    switch(code[i]) {
+      case '>':
+        /*
+         * Tape is supplied as a pointer by the called in rdi
+         * 
+         * inc rdi
+         */
+        emit1(&state, 0x48);
+        emit1(&state, 0xff);
+        emit1(&state, 0xc7);
+        break;
+
+      case '<':
+        // dec rdi
+        emit1(&state, 0x48);
+        emit1(&state, 0xff);
+        emit1(&state, 0xcf);
+        break;
+
+      case '+':
+        // inc byte [rdi]
+        emit1(&state, 0xfe);
+        emit1(&state, 0x07);
+        break;
+
+      case '-':
+        // dec byte [rdi]
+        emit1(&state, 0xfe);
+        emit1(&state, 0x0f);
+        break;
+      
+      case '.':
+        // mov rbx, rdi ;save rdi for write syscall
+        emit1(&state, 0x48);
+        emit1(&state, 0x89);
+        emit1(&state, 0xfb);
+
+        // mov al, byte [rbx] ;arg2 char to write
+        emit1(&state, 0x8a);
+        emit1(&state, 0x03);
+
+        // mov rax, 1 ;syscall number
+        emit1(&state, 0xb8);
+        emit4(&state, 0x01000000);
+
+        // mov rdi, 1 ; arg1 stdout
+        emit1(&state, 0xbf);
+        emit4(&state, 0x01000000);
+
+        // mov rdx, 1; arg3 size
+        emit1(&state, 0xba);
+        emit4(&state, 0x01000000);
+
+        // syscall
+        emit1(&state, 0x0f);
+        emit1(&state, 0x05);
+
+        // mov rdi, rbx
+        emit1(&state, 0x48);
+        emit1(&state, 0x89);
+        emit1(&state, 0xdf);
+        break;
+    }
+  }
 }
 
 int main(int argc, char *argv[]) {
