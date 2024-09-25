@@ -1,15 +1,21 @@
 CC=gcc
 CFLAGS=-Wall -Wextra -Werror -g -O2
 
-BIN=bfi
-SRC=bfi.c
+BIN_INT=bfi
+SRC_INT=bfi.c
 
-all: $(BIN)
+BIN_COMP=bfc
+SRC_COMP=bfc.c
 
-$(BIN): $(SRC)
+all: $(BIN_INT) $(BIN_COMP)
+
+$(BIN_INT): $(SRC_INT)
+	$(CC) $(CFLAGS) -o $@ $^
+
+$(BIN_COMP): $(SRC_COMP)
 	$(CC) $(CFLAGS) -o $@ $^
 
 clean:
-	rm -f $(BIN)
+	rm -f $(BIN_INT) $(BIN_COMP)
 
 .PHONY: all clean

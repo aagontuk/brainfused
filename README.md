@@ -15,3 +15,13 @@ To run with [computed goto](https://eli.thegreenplace.net/2012/07/12/computed-go
 ```
 ./bfi --cgoto BF_FILE
 ```
+
+### Running the compiler ###
+
+Currently the compiler emits x86_64 assembly. Here are steps to compile and run BF code on x86_64 GNU/Linux machine:
+
+```
+./bfc mandel.bf mandel.asm
+nasm -f elf64 -o mandel.o mandel.asm
+ld -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o mandel mandel.o -lc
+```
