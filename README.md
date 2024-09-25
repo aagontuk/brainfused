@@ -1,6 +1,6 @@
 ### Building the interpreter ###
 
-To build the interpreter run `make`
+To build the interpreter and the compiler run `make`
 
 ### Running the interpreter ###
 
