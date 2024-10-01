@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #define TAP_SIZE 1048576
+#define MAX_LOOPS 1024
 
 #define HALT 0
 #define BF_RIGHT 1
@@ -25,17 +26,85 @@ struct pstats {
   uint64_t out;
 };
 
+struct loop_info {
+  int start;
+  int end;
+  int count;
+};
+
 static bool profile = false;
 static struct pstats *stats;
 
-int bf_interp(unsigned char *code) {
+int compare(const void *a, const void *b) {
+  struct loop_info *l1 = (struct loop_info *)a;
+  struct loop_info *l2 = (struct loop_info *)b;
+
+  return l1->count - l2->count;
+}
+
+int get_info_index(struct loop_info linfo[], int total_loops, int start) {
+  for (int i = 0; i < total_loops; i++) {
+    if (linfo[i].start == start)
+      return i;
+  }
+
+  return -1;
+}
+
+bool is_simple_loop(unsigned char *program, struct loop_info *linfo) {
+  int start = linfo->start;
+  int end = linfo->end;
+  int pointer_movement = 0;
+  int p0_change = 0;
+  bool has_io = false;
+
+  for (int i = start + 1; i < end; i++) {
+    switch (program[i]) {
+      case '>': pointer_movement++; break;
+      case '<': pointer_movement--; break;
+      case '+': if (pointer_movement == 0) p0_change++; break;
+      case '-': if (pointer_movement == 0) p0_change--; break;
+      case '.':
+      case ',': has_io = true; break;
+    }
+  }
+
+  // if simple print it
+  if (!has_io && pointer_movement == 0 && (p0_change == 1 || p0_change == -1))
+    return true;
+
+  return false;
+}
+
+void print_loop(unsigned char *program, struct loop_info *linfo) {
+  for (int i = linfo->start; i <= linfo->end; i++) {
+    if (program[i] == '>' || program[i] == '<'
+        || program[i] == '+' || program[i] == '-'
+        || program[i] == '.' || program[i] == ','
+        || program[i] == '[' || program[i] == ']') {
+      
+      printf("%c", program[i]);
+    }
+  }
+
+  printf(" => %d\n", linfo->count);
+}
+
+int bf_interp(unsigned char *program) {
   char *tape = (char *)calloc(TAP_SIZE, 1);
   char *ptr = tape;
-  char *loop_pr_buff;
-  int loop_pr_pos = 0;
-
-  if (profile)
-    loop_pr_buff = (char *)malloc(TAP_SIZE);
+  unsigned char *code = program;
+  struct loop_info loops[MAX_LOOPS];
+  struct loop_info simple_loops[MAX_LOOPS];
+  struct loop_info not_simple_loops[MAX_LOOPS];
+  int loop_index;
+  int loop_start = 0;
+  int loop_end = 0;
+  int loop_stack = 0;
+  int total_loops = 0;
+  int total_simple_loops = 0;
+  int total_not_simple_loops = 0;
+  bool is_inner = false;
 
   while(*code) {
     switch(*code) {
@@ -93,6 +162,7 @@ int bf_interp(unsigned char *code) {
         break;
       
       case '[':
+        // skip the loop
         if(!*ptr) {
           int loop = 1;
           while(loop) {
@@ -101,9 +171,53 @@ int bf_interp(unsigned char *code) {
             if(*code == ']') loop--;
           }
         }
+        else {
+          if (profile) {
+            loop_stack++;
+            is_inner = false;
+            loop_start = code - program;
+          }
+        }
         break;
       
       case ']':
+        if (profile) {
+          loop_stack--;
+
+          if (loop_stack == 0) {
+            loop_end = (int)(code - program);
+            loop_index = get_info_index(loops, total_loops, loop_start);
+            if (loop_index != -1) {
+              loops[loop_index].count++;
+            }
+            else {
+              loops[total_loops].start = loop_start;
+              loops[total_loops].end = loop_end;
+              loops[total_loops++].count = 1;
+            }
+
+            // printf("simple loop: [%d, %d]\n", loop_start, loop_end);
+          }
+          else {
+            if (!is_inner) {
+              // inner loop
+              loop_end = (int)(code - program);
+              loop_index = get_info_index(loops, total_loops, loop_start);
+              if (loop_index != -1) {
+                loops[loop_index].count++;
+              }
+              else {
+                loops[total_loops].start = loop_start;
+                loops[total_loops].end = loop_end;
+                loops[total_loops++].count = 1;
+              }
+              // printf("simple loop: [%d, %d]\n", loop_start, loop_end);
+              is_inner = true;
+            }
+          }
+        }
+
+        // jump to matching [
         if(*ptr) {
           int loop = 1;
           while(loop) {
@@ -119,6 +233,37 @@ int bf_interp(unsigned char *code) {
     }
 
     code++;
+  }
+
+  // print statistics
+  if (profile) {
+    printf("\n\n ====== PROFILE ======\n\n");
+    printf("> => %lu\n", stats->right);
+    printf("< => %lu\n", stats->left);
+    printf("+ => %lu\n", stats->inc);
+    printf("- => %lu\n", stats->dec);
+    printf(", => %lu\n", stats->in);
+    printf(". => %lu\n\n", stats->out);
+    for (int i = 0; i < total_loops; i++) {
+      if (is_simple_loop(program, &loops[i]))
+        simple_loops[total_simple_loops++] = loops[i];
+      else
+        not_simple_loops[total_not_simple_loops++] = loops[i];
+    }
+
+    qsort(simple_loops, total_simple_loops, sizeof(struct loop_info), compare);
+    qsort(not_simple_loops, total_not_simple_loops, sizeof(struct loop_info), compare);
+
+    // print loops
+    printf("Simple inner loops:\n");
+    for (int i = 0; i < total_simple_loops; i++) {
+      print_loop(program, &simple_loops[i]);
+    }
+    
+    printf("\nOther inner loops:\n");
+    for (int i = 0; i < total_not_simple_loops; i++) {
+      print_loop(program, &not_simple_loops[i]);
+    }
   }
 
   return 0;
