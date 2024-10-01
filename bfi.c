@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #define TAP_SIZE 1048576
 
@@ -15,9 +16,26 @@
 #define BF_OPEN 7
 #define BF_CLOSE 8
 
+struct pstats {
+  uint64_t right;
+  uint64_t left;
+  uint64_t inc;
+  uint64_t dec;
+  uint64_t in;
+  uint64_t out;
+};
+
+static bool profile = false;
+static struct pstats *stats;
+
 int bf_interp(unsigned char *code) {
   char *tape = (char *)calloc(TAP_SIZE, 1);
   char *ptr = tape;
+  char *loop_pr_buff;
+  int loop_pr_pos = 0;
+
+  if (profile)
+    loop_pr_buff = (char *)malloc(TAP_SIZE);
 
   while(*code) {
     switch(*code) {
@@ -26,6 +44,10 @@ int bf_interp(unsigned char *code) {
             fprintf(stderr, "error: tap overflow\n");
             return -1;
         }
+
+        if (profile)
+          stats->right++;
+
         ptr++;
         break;
       
@@ -34,23 +56,40 @@ int bf_interp(unsigned char *code) {
             fprintf(stderr, "error: tap underflow\n");
             return -1;
         }
+        
+        if (profile)
+          stats->left++;
+        
         ptr--;
         break;
       
       case '+':
+        if (profile)
+          stats->inc++;
+        
         (*ptr)++;
         break;
       
       case '-':
+        if (profile)
+          stats->dec++;
+        
         (*ptr)--;
         break;
       
       case '.':
+        if (profile)
+          stats->out++;
+
         putchar(*ptr);
         break;
       
       case ',':
+        if (profile)
+          stats->in++;
+        
         *ptr = getchar();
+        getchar();
         break;
       
       case '[':
@@ -211,13 +250,14 @@ int main(int argc, char *argv[]) {
   struct option longopts[] = {
     { .name = "interp", .val = 'i', },
     { .name = "cgoto", .val = 'g', },
+    { .name = "profile", .val = 'p', },
   };
 
   bool cgoto = false;
   bool interp = false;
 
   int opt;
-  while ((opt = getopt_long(argc, argv, "ig", longopts, NULL)) != -1) {
+  while ((opt = getopt_long(argc, argv, "igp", longopts, NULL)) != -1) {
     switch(opt) {
       case 'i':
         interp = true;
@@ -225,11 +265,16 @@ int main(int argc, char *argv[]) {
       case 'g':
         cgoto = true;
         break;
+      case 'p':
+        profile = true;
+        break;
       default:
         printf("Unkown option\n");
         return 1;
     }
   }
+
+  stats = (struct pstats *)calloc(1, sizeof(struct pstats));
 
   FILE *file = fopen(argv[optind], "r");
   if(!file) {
