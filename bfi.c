@@ -238,12 +238,12 @@ int bf_interp(unsigned char *program) {
   // print statistics
   if (profile) {
     printf("\n\n ====== PROFILE ======\n\n");
-    printf("> => %lu\n", stats->right);
-    printf("< => %lu\n", stats->left);
-    printf("+ => %lu\n", stats->inc);
-    printf("- => %lu\n", stats->dec);
-    printf(", => %lu\n", stats->in);
-    printf(". => %lu\n\n", stats->out);
+    printf("> => %llu\n", stats->right);
+    printf("< => %llu\n", stats->left);
+    printf("+ => %llu\n", stats->inc);
+    printf("- => %llu\n", stats->dec);
+    printf(", => %llu\n", stats->in);
+    printf(". => %llu\n\n", stats->out);
     for (int i = 0; i < total_loops; i++) {
       if (is_simple_loop(program, &loops[i]))
         simple_loops[total_simple_loops++] = loops[i];
