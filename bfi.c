@@ -442,6 +442,10 @@ int main(int argc, char *argv[]) {
     bf_interp(code);
   else if (cgoto)
     interp_cgoto(code, length);
+  else {
+    printf("Please specify an interpreter\n");
+    return 1;
+  }
   
   return 0;
 }
