@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <stdbool.h>
-#include <stdint.h>
+#include "bf_jit_x86_64.h"
 
 #define TAP_SIZE 1048576
 
@@ -44,7 +44,7 @@ void gen_epilogue(FILE *ofile) {
   );
 }
 
-int bf_comp(unsigned char *code, FILE *ofile) {
+int bf_aot_comp(unsigned char *code, FILE *ofile) {
   int loop_stack[100];
   int loop_stack_pos = 0;
   int loop_count = 0;
@@ -109,6 +109,99 @@ int bf_comp(unsigned char *code, FILE *ofile) {
   return 0;
 }
 
+void bf_jit_com_x86_64(unsigned char *code, int len) {
+  struct jit_state state;
+  
+  state.buf = (uint8_t *)malloc(MAX_OFFSET);
+  state.offset = 0;
+
+  // push callee saved registers
+  emit_push(&state, RBX);
+  emit_push(&state, RBP);
+  emit_push(&state, R12);
+  emit_push(&state, R13);
+  emit_push(&state, R14);
+  emit_push(&state, R15);
+
+  for (int i = 0; i < len; i++) {
+    switch(code[i]) {
+      case '>':
+        /*
+         * Tape is supplied as a pointer by the called in rdi
+         * 
+         * inc rdi
+         */
+        emit1(&state, 0x48);
+        emit1(&state, 0xff);
+        emit1(&state, 0xc7);
+        break;
+
+      case '<':
+        // dec rdi
+        emit1(&state, 0x48);
+        emit1(&state, 0xff);
+        emit1(&state, 0xcf);
+        break;
+
+      case '+':
+        // inc byte [rdi]
+        emit1(&state, 0xfe);
+        emit1(&state, 0x07);
+        break;
+
+      case '-':
+        // dec byte [rdi]
+        emit1(&state, 0xfe);
+        emit1(&state, 0x0f);
+        break;
+      
+      case '.':
+        // mov rbx, rdi ;save rdi for write syscall
+        emit1(&state, 0x48);
+        emit1(&state, 0x89);
+        emit1(&state, 0xfb);
+
+        // mov al, byte [rbx] ;arg2 char to write
+        emit1(&state, 0x8a);
+        emit1(&state, 0x03);
+
+        // mov rax, 1 ;syscall number
+        emit1(&state, 0xb8);
+        emit4(&state, 0x01000000);
+
+        // mov rdi, 1 ; arg1 stdout
+        emit1(&state, 0xbf);
+        emit4(&state, 0x01000000);
+
+        // mov rdx, 1; arg3 size
+        emit1(&state, 0xba);
+        emit4(&state, 0x01000000);
+
+        // syscall
+        emit1(&state, 0x0f);
+        emit1(&state, 0x05);
+
+        // mov rdi, rbx
+        emit1(&state, 0x48);
+        emit1(&state, 0x89);
+        emit1(&state, 0xdf);
+        break;
+        
+      case '[':
+        // cmp byte [rdi], 0
+        emit1(&state, 0x80);
+        emit1(&state, 0x3f);
+        emit1(&state, 0x00);
+
+        // je loop_end
+        emit1(&state, 0x0f);
+        emit1(&state, 0x84);
+        emit4(&state, 0x00000000);
+        break;
+    }
+  }
+}
+
 int main(int argc, char *argv[]) {
   FILE *ofile;
 
@@ -134,7 +227,7 @@ int main(int argc, char *argv[]) {
   code[length] = '\0';
   fclose(file);
 
-  bf_comp(code, ofile);
+  bf_aot_comp(code, ofile);
   
   return 0;
 }
