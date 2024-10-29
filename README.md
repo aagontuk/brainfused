@@ -22,12 +22,20 @@ To run with the profiler:
 ./bfi -i -p BF_FILE
 ```
 
-### Running the compiler ###
+### Running the compiler AOT ###
 
 Currently the compiler emits x86_64 assembly. Here are steps to compile and run BF code on x86_64 GNU/Linux machine:
 
 ```
-./bfc mandel.bf mandel.asm
+./bfc --aot mandel.bf mandel.asm
 nasm -f elf64 -o mandel.o mandel.asm
 ld -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o mandel mandel.o -lc
+```
+
+### Running the compiler JIT ###
+
+To run the JIT compiler:
+
+```
+./bfc --jit mandel.bf
 ```
