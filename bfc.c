@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <stdbool.h>
+#include <sys/mman.h>
 #include "bf_jit_x86_64.h"
 
 #define TAP_SIZE 1048576
@@ -109,11 +110,28 @@ int bf_aot_comp(unsigned char *code, FILE *ofile) {
   return 0;
 }
 
+uint32_t compute_pc_rel32(uint32_t from, uint32_t to) {
+  if (to >= from)
+    return to - from;
+  else
+    return ~(from - to) + 1;
+}
+
+void replace_bytes(uint8_t *buf, uint32_t offset, uint32_t value, int size) {
+  for (int i = 0; i < size; i++) {
+    buf[offset + i] = (value >> (i * 8)) & 0xff;
+  }
+}
+
 void bf_jit_com_x86_64(unsigned char *code, int len) {
   struct jit_state state;
   
   state.buf = (uint8_t *)malloc(MAX_OFFSET);
   state.offset = 0;
+
+  uint32_t open_bracket_off[MAX_NESTING];
+  uint32_t open_br_off;
+  uint32_t open_bracket_index = 0;
 
   // push callee saved registers
   emit_push(&state, RBX);
@@ -192,42 +210,118 @@ void bf_jit_com_x86_64(unsigned char *code, int len) {
         emit1(&state, 0x80);
         emit1(&state, 0x3f);
         emit1(&state, 0x00);
+        open_bracket_off[open_bracket_index++] = state.offset;
 
-        // je loop_end
+        // jz 0
         emit1(&state, 0x0f);
         emit1(&state, 0x84);
         emit4(&state, 0x00000000);
         break;
+
+      case ']':
+        open_br_off = open_bracket_off[--open_bracket_index];
+        
+        // cmp byte [rdi], 0
+        emit1(&state, 0x80);
+        emit1(&state, 0x3f);
+        emit1(&state, 0x00);
+
+        uint32_t jmp_open_from = state.offset + 6;
+        uint32_t jmp_open_to = open_br_off + 6;
+        uint32_t jmp_open_off = compute_pc_rel32(jmp_open_from, jmp_open_to);
+
+        // jnz jmp_open_off
+        emit1(&state, 0x0f);
+        emit1(&state, 0x85);
+        emit4(&state, jmp_open_off);
+
+        uint32_t jmp_close_from = open_br_off + 6;
+        uint32_t jmp_close_to = state.offset;
+        uint32_t jmp_close_off = compute_pc_rel32(jmp_close_from, jmp_close_to);
+
+        // replace off
+        replace_bytes(state.buf, open_br_off + 2, jmp_close_off, 4);
+        break;
     }
   }
+
+  emit_pop(&state, R15);
+  emit_pop(&state, R14);
+  emit_pop(&state, R13);
+  emit_pop(&state, R12);
+  emit_pop(&state, RBP);
+  emit_pop(&state, RBX);
+
+  void *jitted_code = mmap(NULL, state.offset, PROT_EXEC | PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  memcpy(jitted_code, state.buf, state.offset);
+  typedef void (*jit_fn)(uint64_t *);
+  jit_fn fn = (jit_fn)jitted_code;
+  uint64_t *tape = (uint64_t *)calloc(TAP_SIZE, sizeof(uint64_t));
+  fn(tape);
 }
 
 int main(int argc, char *argv[]) {
   FILE *ofile;
 
-  if (argc < 3)
-    ofile = stdout;
-  else
-    ofile = fopen(argv[2], "w");
+  struct option longopts[] = {
+    {.name = "aot", .val = 'a', },
+    {.name = "jit", .val = 'j', },
+  };
 
-  FILE *file = fopen(argv[1], "r");
-  if(!file) {
+  bool aot = false;
+
+  int opt;
+  while ((opt = getopt_long(argc, argv, "aj", longopts, NULL)) != -1) {
+    switch(opt) {
+      case 'a':
+        aot = true;
+        break;
+      case 'j':
+        break;
+      default:
+        printf("Unkown option\n");
+        return 1;
+    }
+  }
+
+  if (optind >= argc) {
+    printf("Error: No input file\n");
+    return 1;
+  }
+
+  FILE *ifile = fopen(argv[optind++], "r");
+  if(!ifile) {
     printf("Error: Could not open file\n");
     return 1;
   }
 
-  fseek(file, 0, SEEK_END);
-  long length = ftell(file);
-  fseek(file, 0, SEEK_SET);
+  if (aot) {
+    if (optind < argc) {
+      ofile = fopen(argv[optind], "w");
+      if(!ofile) {
+        printf("Error: Could not open file\n");
+        return 1;
+      }
+    }
+    else {
+      ofile = stdout;
+    }
+  }
+
+  fseek(ifile, 0, SEEK_END);
+  long length = ftell(ifile);
+  fseek(ifile, 0, SEEK_SET);
 
   unsigned char *code = (unsigned char *)malloc(length + 1);
-  int rv = fread(code, 1, length, file);
+  int rv = fread(code, 1, length, ifile);
   if (rv != length)
     return 1;
   code[length] = '\0';
-  fclose(file);
+  fclose(ifile);
 
-  bf_aot_comp(code, ofile);
+  (void)ofile;
+  // bf_aot_comp(code, ofile);
+  bf_jit_com_x86_64(code, length);
   
   return 0;
 }
