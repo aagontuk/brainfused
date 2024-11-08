@@ -1,0 +1,140 @@
+Benchmarking bench.b
+
+LLVM Compilation
+
+real	0m0.184s
+user	0m0.184s
+sys	0m0.000s
+
+AOT Compilation
+
+real	0m0.247s
+user	0m0.247s
+sys	0m0.000s
+
+Benchmarking bottles.b
+
+LLVM Compilation
+
+real	0m0.001s
+user	0m0.000s
+sys	0m0.001s
+
+AOT Compilation
+
+real	0m0.009s
+user	0m0.005s
+sys	0m0.005s
+
+Benchmarking deadcodetest.b
+
+LLVM Compilation
+
+real	0m0.001s
+user	0m0.001s
+sys	0m0.000s
+
+AOT Compilation
+
+real	0m0.001s
+user	0m0.001s
+sys	0m0.000s
+
+Benchmarking hanoi.b
+
+LLVM Compilation
+
+real	0m5.111s
+user	0m5.110s
+sys	0m0.000s
+
+AOT Compilation
+
+real	0m6.822s
+user	0m6.814s
+sys	0m0.008s
+
+Benchmarking hello.b
+
+LLVM Compilation
+
+real	0m0.001s
+user	0m0.001s
+sys	0m0.000s
+
+AOT Compilation
+
+real	0m0.001s
+user	0m0.000s
+sys	0m0.001s
+
+Benchmarking long.b
+
+LLVM Compilation
+
+real	0m2.557s
+user	0m2.556s
+sys	0m0.000s
+
+AOT Compilation
+
+real	0m4.578s
+user	0m4.578s
+sys	0m0.000s
+
+Benchmarking loopremove.b
+
+LLVM Compilation
+
+real	0m0.001s
+user	0m0.001s
+sys	0m0.000s
+
+AOT Compilation
+
+real	0m0.001s
+user	0m0.000s
+sys	0m0.001s
+
+Benchmarking mandel.b
+
+LLVM Compilation
+
+real	0m2.051s
+user	0m2.051s
+sys	0m0.000s
+
+AOT Compilation
+
+real	0m2.834s
+user	0m2.830s
+sys	0m0.004s
+
+Benchmarking serptri.b
+
+LLVM Compilation
+
+real	0m0.001s
+user	0m0.000s
+sys	0m0.001s
+
+AOT Compilation
+
+real	0m0.002s
+user	0m0.002s
+sys	0m0.000s
+
+Benchmarking twinkle.b
+
+LLVM Compilation
+
+real	0m0.001s
+user	0m0.001s
+sys	0m0.000s
+
+AOT Compilation
+
+real	0m0.001s
+user	0m0.001s
+sys	0m0.000s
+
